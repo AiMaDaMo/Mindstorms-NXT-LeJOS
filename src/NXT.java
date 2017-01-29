@@ -1,100 +1,124 @@
 import lejos.nxt.Button;
 import lejos.nxt.Motor;
+import lejos.nxt.comm.BTConnection;
+import lejos.nxt.comm.Bluetooth;
 
-public class NXT {
-    private int motorA;
-    private int motorB;
-    private int motorC;
+class NXT {
 
-    public long start;
-    public int mode = 1;
+    private static final int MAX_STEERING_ANGLE = 64;
 
-    private BeepThread beepThread;
+    private int mMotorA;
+    private int mMotorB;
+    private int mMotorC;
 
-    boolean sound;
+    private BeepThread mBeepThread;
 
-    public void init() {
+    private boolean mSound;
+
+    private boolean mIsCalibrated;
+
+    void start() {
+        Motor.A.setAcceleration(1000);
+        Motor.B.setAcceleration(600);
+
         Motor.C.setSpeed(20);
+        Motor.C.setAcceleration(500);
 
-        beepThread = new BeepThread();
-        beepThread.start();
+        System.out.println("Waiting for connection");
 
-        Motor.A.setAcceleration(2000);
-        Motor.B.setAcceleration(2000);
-        Motor.C.setAcceleration(2000);
+        BTConnection connection = Bluetooth.waitForConnection();
 
-        new ReadThread(this).start();
+        if (connection == null) {
+            System.out.println("Connection failed");
+            Button.ENTER.waitForPressAndRelease();
+            System.exit(1);
+        }
 
-        run();
+        new ReadThread(connection, this).start();
+
+        mBeepThread = new BeepThread();
+        mBeepThread.start();
+
+        Motor.B.flt();
+
+        System.out.println("Press ENTER to calibrate!");
+        Button.ENTER.waitForPressAndRelease();
+
+        Motor.B.resetTachoCount();
+
+        mIsCalibrated = true;
+
+        runForever();
     }
 
-    public void run() {
-        while (!Button.ESCAPE.isPressed()) {
-            Motor.A.setSpeed(Math.abs(motorA));
+    private void runForever() {
+        while (!Button.ESCAPE.isDown()) {
+            Motor.A.setSpeed(Math.abs(mMotorA));
 
-            if (motorA > 0) {
-                Motor.A.backward();
-            } else if (motorA < 0) {
+            if (mMotorA > 0) {
                 Motor.A.forward();
+            } else if (mMotorA < 0) {
+                Motor.A.backward();
             }
 
-            Motor.B.setSpeed(150);
-            if (motorB != Integer.MAX_VALUE) {
-                int angle = (motorB - Motor.B.getTachoCount()) > 80 ? 80 : (motorB - Motor.B.getTachoCount()) < -80
-                        ? -80 : (motorB - Motor.B.getTachoCount());
-                Motor.B.rotate(angle, true);
-                motorB = Integer.MAX_VALUE;
+            Motor.B.setSpeed(200);
+
+            if (mMotorB != Integer.MAX_VALUE) {
+                if (mMotorB > MAX_STEERING_ANGLE) {
+                    mMotorB = MAX_STEERING_ANGLE;
+                } else if (mMotorB < -MAX_STEERING_ANGLE) {
+                    mMotorB = -MAX_STEERING_ANGLE;
+                }
+
+                //int angle = (int) Math.pow(1.10781128, mMotorB);
+
+                Motor.B.rotateTo((int) (mMotorB * 2.1), true);
+
+                mMotorB = Integer.MAX_VALUE;
             }
 
-            if (motorC != 0) {
-                Motor.C.rotate(motorC, false);
-                motorC = 0;
+            if (mMotorC != 0) {
+                Motor.C.rotate(mMotorC, false);
+                mMotorC = 0;
             } else {
                 Motor.C.stop();
             }
 
-            if (motorA < -10 || motorB < -10) {
-                if (sound) beepThread.beep = true;
+            if (mMotorA < -10) {
+                if (mSound) {
+                    mBeepThread.mBeep = true;
+                }
             } else {
-                beepThread.beep = false;
+                mBeepThread.mBeep = false;
             }
         }
     }
 
-    public void calibrateSteering() {
-        Motor.B.stop();
-        Motor.B.resetTachoCount();
+
+    boolean isCalibrated() {
+        return mIsCalibrated;
     }
 
-    public int getMotorA() {
-        return motorA;
+    boolean isSound() {
+        return mSound;
     }
 
-    public void setMotorA(int motorA) {
-        this.motorA = motorA;
+    void setSound(boolean sound) {
+        this.mSound = sound;
     }
 
-    public int getMotorB() {
-        return motorB;
+
+    // ================================================= MOTORS ========================================================
+
+    void setMotorA(int motorA) {
+        this.mMotorA = motorA;
     }
 
-    public void setMotorB(int motorB) {
-        this.motorB = motorB;
+    void setMotorB(int motorB) {
+        this.mMotorB = motorB;
     }
 
-    public int getMotorC() {
-        return motorC;
-    }
-
-    public void setMotorC(int motorC) {
-        this.motorC = motorC;
-    }
-
-    public boolean isSound() {
-        return sound;
-    }
-
-    public void setSound(boolean sound) {
-        this.sound = sound;
+    void setMotorC(int motorC) {
+        this.mMotorC = motorC;
     }
 }

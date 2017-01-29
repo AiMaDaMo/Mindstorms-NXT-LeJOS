@@ -1,16 +1,17 @@
 import lejos.nxt.Sound;
 
 public class BeepThread extends Thread {
-    boolean beep;
+
+    boolean mBeep;
 
     public void run() {
         while (true) {
-            if (beep) {
+            if (mBeep) {
                 Sound.beep();
+
                 try {
                     Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                } catch (InterruptedException ignored) {
                 }
             }
         }
